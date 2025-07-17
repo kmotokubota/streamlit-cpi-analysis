@@ -497,7 +497,6 @@ def create_major_category_chart(df, selected_categories, chart_type="yoy"):
     fig.update_layout(
         title={
             'text': f'📊 主要カテゴリー CPI {y_title}推移（積み上げ表示）',
-            'x': 0.5,
             'font': {'size': 18, 'family': 'Arial, sans-serif'}
         },
         xaxis_title='期間',
@@ -791,7 +790,6 @@ def create_inflation_rate_chart(inflation_data):
     fig.update_layout(
         title={
             'text': '📊 インフレ率比較（前年同月比 vs 前月比）',
-            'x': 0.5,
             'font': {'size': 18, 'family': 'Arial, sans-serif'}
         },
         xaxis_title='商品・サービス',
@@ -918,7 +916,6 @@ def create_individual_products_chart(df, selected_products, chart_type="yoy"):
     fig.update_layout(
         title={
             'text': f'📊 CPI {y_title}推移（積み上げ表示）',
-            'x': 0.5,
             'font': {'size': 18, 'family': 'Arial, sans-serif'}
         },
         xaxis_title='期間',
@@ -1499,7 +1496,6 @@ def main():
                 fig_corr.update_layout(
                     height=600,  # 高さを増加
                     title={
-                        'x': 0.5,
                         'font': {'size': 16}
                     }
                 )
