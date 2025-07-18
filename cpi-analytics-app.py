@@ -108,13 +108,13 @@ def get_major_cpi_categories():
         "📈 All Items": {
             "products": ["All items"],
             "description": "総合CPI（全項目）",
-            "color": "#2E86AB",
+            "color": "#1E88E5",  # より鮮やかな青
             "display_type": "line"
         },
         "🎯 Core CPI": {
             "products": ["All items less food and energy", "All items less food, energy, and shelter"],
             "description": "コアCPI（食品・エネルギー除く）",
-            "color": "#A23B72",
+            "color": "#D32F2F",  # より鮮やかな赤
             "display_type": "line"
         },
         "🍎 Food": {
@@ -142,6 +142,38 @@ def get_major_cpi_categories():
             "display_type": "bar"
         }
     }
+
+@st.cache_data(ttl=3600)
+def get_cpi_contribution_categories():
+    """寄与度分析用の主要CPIカテゴリーとウェイトを定義"""
+    # 実際のCPIバスケットの相対的ウェイト（概算）
+    categories = {
+        "Core Services": {
+            "products": ["Services less energy services", "Shelter", "Transportation services"],
+            "weight": 0.58,  # 約58%
+            "color": "#4E8397",  # メインカテゴリーと同じ色
+            "description": "コアサービス（住宅・交通・その他サービス）"
+        },
+        "Core Goods": {
+            "products": ["Commodities less food and energy commodities", "New vehicles", "Used vehicles and trucks"],
+            "weight": 0.20,  # 約20%
+            "color": "#845EC2",  # メインカテゴリーと同じ色
+            "description": "コア商品（自動車・家具・衣料等）"
+        },
+        "Food": {
+            "products": ["Food", "Food at home", "Food away from home"],
+            "weight": 0.14,  # 約14%
+            "color": "#F18F01",  # メインカテゴリーと同じ色
+            "description": "食品（内食・外食）"
+        },
+        "Energy": {
+            "products": ["Energy", "Energy commodities", "Energy services", "Gasoline (all types)"],
+            "weight": 0.08,  # 約8%
+            "color": "#C73E1D",  # メインカテゴリーと同じ色
+            "description": "エネルギー（ガソリン・電気・ガス）"
+        }
+    }
+    return categories
 
 @st.cache_data(ttl=3600)
 def check_contribution_data_availability():
@@ -305,6 +337,17 @@ def calculate_inflation_metrics(df, variable_name):
     
     return metrics
 
+
+def get_periods_for_frequency(frequency):
+    """頻度に応じた前年同期比計算の期間数を返す"""
+    frequency_periods = {
+        'Monthly': 12,       # 12ヶ月前
+        'Quarterly': 4,      # 4四半期前
+        'Semi-annual': 2,    # 2半期前
+        'Annual': 1          # 1年前
+    }
+    return frequency_periods.get(frequency, 12)  # デフォルトは Monthly
+
 def calculate_yoy_monthly_data(df):
     """毎月のYoY%データを計算"""
     if df.empty:
@@ -366,7 +409,7 @@ def create_stacked_histogram(df, selected_products, chart_type="yoy"):
             x=products,
             y=positive_values,
             marker_color='#1f77b4',
-            opacity=0.8,
+            opacity=0.85,
             hovertemplate=f'<b>%{{x}}</b><br>{y_title}: %{{y:.2f}}%<extra></extra>'
         ))
     
@@ -377,15 +420,71 @@ def create_stacked_histogram(df, selected_products, chart_type="yoy"):
             x=products,
             y=negative_values,
             marker_color='#d62728',
-            opacity=0.8,
+            opacity=0.85,
             hovertemplate=f'<b>%{{x}}</b><br>{y_title}: %{{y:.2f}}%<extra></extra>'
         ))
     
+    # Y軸の範囲を動的に設定（詳細な計算）
+    if values:
+        # 有効な数値データのみを使用
+        valid_data = [x for x in values if not pd.isna(x) and abs(x) < 1000]
+        
+        if valid_data:
+            y_min = min(valid_data)
+            y_max = max(valid_data)
+            y_range_size = y_max - y_min
+            
+            # 適切なマージンを追加
+            if y_range_size > 0.1:  # 最小範囲チェック
+                margin = max(y_range_size * 0.15, 0.5)  # 最小マージン確保
+                y_range = [y_min - margin, y_max + margin]
+            else:
+                # データ範囲が小さい場合
+                center = (y_min + y_max) / 2
+                y_range = [center - 1, center + 1]
+            
+            # ゼロラインを含むように調整
+            if y_range[0] > 0.1:
+                y_range[0] = min(y_range[0], -0.2)
+            if y_range[1] < -0.1:
+                y_range[1] = max(y_range[1], 0.2)
+        else:
+            y_range = [-1, 5]
+
+    # Y軸の範囲を動的に設定（詳細な計算）
+    if values:
+        # 有効な数値データのみを使用
+        valid_data = [x for x in values if not pd.isna(x) and abs(x) < 1000]
+        
+        if valid_data:
+            y_min = min(valid_data)
+            y_max = max(valid_data)
+            y_range_size = y_max - y_min
+            
+            # 適切なマージンを追加
+            if y_range_size > 0.1:  # 最小範囲チェック
+                margin = max(y_range_size * 0.15, 0.5)  # 最小マージン確保
+                y_range = [y_min - margin, y_max + margin]
+            else:
+                # データ範囲が小さい場合
+                center = (y_min + y_max) / 2
+                y_range = [center - 1, center + 1]
+            
+            # ゼロラインを含むように調整
+            if y_range[0] > 0.1:
+                y_range[0] = min(y_range[0], -0.2)
+            if y_range[1] < -0.1:
+                y_range[1] = max(y_range[1], 0.2)
+        else:
+            y_range = [-1, 5]
+    else:
+        y_range = [-1, 5]
+
     # レイアウト設定
     fig.update_layout(
         title={
             'text': f'📊 {y_title}積み上げ分析',
-            'x': 0.5,
+            'x': 0,
             'font': {'size': 18, 'family': 'Arial, sans-serif'}
         },
         xaxis_title='商品・サービス',
@@ -403,6 +502,9 @@ def create_stacked_histogram(df, selected_products, chart_type="yoy"):
         plot_bgcolor='white',
         paper_bgcolor='white'
     )
+    
+    # Y軸範囲を確実に設定
+    fig.update_yaxes(range=y_range)
     
     # ゼロラインの追加
     fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.7, line_width=1)
@@ -430,6 +532,9 @@ def create_major_category_chart(df, selected_categories, chart_type="yoy"):
     fig = go.Figure()
     major_categories = get_major_cpi_categories()
     
+    # Y軸の範囲を動的に設定するための変数
+    all_y_values = []
+    
     for category in selected_categories:
         if category in major_categories:
             category_info = major_categories[category]
@@ -445,9 +550,12 @@ def create_major_category_chart(df, selected_categories, chart_type="yoy"):
                 if len(category_products) == 1:
                     main_product = category_products[0]
                 else:
-                    # 最もデータが多い商品を選択
+                    # 最もデータが多い商品を選択、見つからない場合は最初の商品を使用
                     product_counts = category_data.groupby('PRODUCT').size()
-                    main_product = product_counts.idxmax()
+                    if not product_counts.empty:
+                        main_product = product_counts.idxmax()
+                    else:
+                        main_product = category_products[0]
                 
                 product_data = category_data[category_data['PRODUCT'] == main_product].copy()
                 
@@ -463,6 +571,9 @@ def create_major_category_chart(df, selected_categories, chart_type="yoy"):
                     if not y_values.empty:
                         category_name = category.split(' ', 1)[1] if ' ' in category else category
                         
+                        # Y軸範囲計算用にデータを保存
+                        all_y_values.extend(y_values.tolist())
+                        
                         if display_type == "bar":
                             # バー表示（Food, Energy, Core Goods, Core Services）
                             fig.add_trace(go.Bar(
@@ -470,7 +581,7 @@ def create_major_category_chart(df, selected_categories, chart_type="yoy"):
                                 y=y_values,
                                 name=category_name,
                                 marker_color=color,
-                                opacity=0.8,
+                                opacity=0.85,
                                 hovertemplate=(
                                     f'<b>{category_name}</b><br>'
                                     '日付: %{x}<br>'
@@ -483,9 +594,10 @@ def create_major_category_chart(df, selected_categories, chart_type="yoy"):
                             fig.add_trace(go.Scatter(
                                 x=yoy_data['DATE'].iloc[-len(y_values):],
                                 y=y_values,
-                                mode='lines',
+                                mode='lines+markers',
                                 name=category_name,
-                                line=dict(color=color, width=3),
+                                line=dict(color=color, width=5),  # より太いライン
+                                marker=dict(size=10, color=color, symbol='circle'),  # より大きなマーカー
                                 hovertemplate=(
                                     f'<b>{category_name}</b><br>'
                                     '日付: %{x}<br>'
@@ -494,9 +606,39 @@ def create_major_category_chart(df, selected_categories, chart_type="yoy"):
                                 )
                             ))
     
+    # Y軸の範囲を動的に設定（詳細な計算）
+    if all_y_values:
+        # 有効な数値データのみを使用
+        valid_data = [x for x in all_y_values if not pd.isna(x) and abs(x) < 1000]
+        
+        if valid_data:
+            y_min = min(valid_data)
+            y_max = max(valid_data)
+            y_range_size = y_max - y_min
+            
+            # 適切なマージンを追加
+            if y_range_size > 0.1:  # 最小範囲チェック
+                margin = max(y_range_size * 0.15, 0.5)  # 最小マージン確保
+                y_range = [y_min - margin, y_max + margin]
+            else:
+                # データ範囲が小さい場合
+                center = (y_min + y_max) / 2
+                y_range = [center - 1, center + 1]
+            
+            # ゼロラインを含むように調整
+            if y_range[0] > 0.1:
+                y_range[0] = min(y_range[0], -0.2)
+            if y_range[1] < -0.1:
+                y_range[1] = max(y_range[1], 0.2)
+        else:
+            y_range = [-1, 5]
+    else:
+        y_range = [-1, 5]
+    
     fig.update_layout(
         title={
             'text': f'📊 主要カテゴリー CPI {y_title}推移（積み上げ表示）',
+            'x': 0,
             'font': {'size': 18, 'family': 'Arial, sans-serif'}
         },
         xaxis_title='期間',
@@ -515,6 +657,9 @@ def create_major_category_chart(df, selected_categories, chart_type="yoy"):
         plot_bgcolor='white',
         paper_bgcolor='white'
     )
+    
+    # Y軸範囲を確実に設定
+    fig.update_yaxes(range=y_range)
     
     # ゼロラインの追加
     fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.7, line_width=1)
@@ -577,7 +722,7 @@ def create_monthly_yoy_breakdown_chart(df, selected_products):
     fig.update_layout(
         title={
             'text': '📈 商品別月次前年同月比詳細分析',
-            'x': 0.5,
+            'x': 0,
             'font': {'size': 18, 'family': 'Arial, sans-serif'}
         },
         height=400 * len(selected_products),
@@ -657,7 +802,7 @@ def generate_ai_analysis(selected_products, inflation_data, ai_model="llama3.1-7
         return f"AI分析でエラーが発生しました: {str(e)}"
 
 def create_cpi_comparison_chart(df, selected_products):
-    """CPI比較チャート（主要カテゴリーと同じ積み上げ形式）"""
+    """CPI比較チャート（従来のライン表示）"""
     if df.empty:
         return go.Figure()
     
@@ -675,24 +820,25 @@ def create_cpi_comparison_chart(df, selected_products):
                 # 最新24ヶ月のデータに限定
                 recent_data = yoy_data.tail(24)
                 
-                fig.add_trace(go.Bar(
+                # ライン表示に変更
+                fig.add_trace(go.Scatter(
                     x=recent_data['DATE'],
                     y=recent_data['YoY_Change'],
+                    mode='lines+markers',
                     name=product,
-                    marker_color=colors[i % len(colors)],
-                    opacity=0.8,
+                    line=dict(color=colors[i % len(colors)], width=3),
+                    marker=dict(size=6),
                     hovertemplate=f'<b>{product}</b><br>日付: %{{x}}<br>前年同月比: %{{y:.2f}}%<extra></extra>'
                 ))
     
     fig.update_layout(
         title={
-            'text': '📈 CPI前年同月比推移（積み上げ表示）',
-            'x': 0.5,
+            'text': '📈 CPI前年同月比推移（ライン表示）',
+            'x': 0,
             'font': {'size': 18, 'family': 'Arial, sans-serif'}
         },
         xaxis_title='期間',
         yaxis_title='前年同月比 (%)',
-        barmode='stack',
         hovermode='x unified',
         height=600,
         showlegend=True,
@@ -790,6 +936,7 @@ def create_inflation_rate_chart(inflation_data):
     fig.update_layout(
         title={
             'text': '📊 インフレ率比較（前年同月比 vs 前月比）',
+            'x': 0,
             'font': {'size': 18, 'family': 'Arial, sans-serif'}
         },
         xaxis_title='商品・サービス',
@@ -904,7 +1051,7 @@ def create_individual_products_chart(df, selected_products, chart_type="yoy"):
                         y=y_recent,
                         name=short_name,
                         marker_color=colors[i % len(colors)],
-                        opacity=0.8,
+                        opacity=0.85,
                         hovertemplate=(
                             f'<b>{short_name}</b><br>'
                             '日付: %{x}<br>'
@@ -916,6 +1063,7 @@ def create_individual_products_chart(df, selected_products, chart_type="yoy"):
     fig.update_layout(
         title={
             'text': f'📊 CPI {y_title}推移（積み上げ表示）',
+            'x': 0,
             'font': {'size': 18, 'family': 'Arial, sans-serif'}
         },
         xaxis_title='期間',
@@ -943,6 +1091,332 @@ def create_individual_products_chart(df, selected_products, chart_type="yoy"):
     fig.update_yaxes(showgrid=True, gridwidth=0.5, gridcolor='lightgray')
     
     return fig
+
+def calculate_contribution_data_for_categories(df, selected_categories=None):
+    """各カテゴリーの寄与度を計算（主要カテゴリー用、選択カテゴリー対応）"""
+    if df.empty:
+        return pd.DataFrame()
+    
+    # All Itemsデータを取得
+    all_items_data = df[df['PRODUCT'] == 'All items'].copy()
+    if all_items_data.empty:
+        return pd.DataFrame()
+    
+    # 前年同月比計算
+    all_items_data = all_items_data.sort_values('DATE')
+    # データの頻度を推定（Monthly がデフォルト）
+    if not df.empty and 'FREQUENCY' in df.columns:
+        frequency = df['FREQUENCY'].iloc[0]
+    else:
+        frequency = 'Monthly'
+    
+    periods = get_periods_for_frequency(frequency)
+    all_items_data['YoY_Change'] = all_items_data['VALUE'].pct_change(periods=periods) * 100
+    
+    # Core CPIデータを取得（選択されている場合のみ）
+    show_core_cpi = selected_categories is None or '🎯 Core CPI' in selected_categories
+    core_cpi_data = pd.DataFrame()  # 初期化
+    if show_core_cpi:
+        core_cpi_data = df[df['PRODUCT'] == 'All items less food and energy'].copy()
+        if not core_cpi_data.empty:
+            core_cpi_data = core_cpi_data.sort_values('DATE')
+            core_cpi_data['YoY_Change'] = core_cpi_data['VALUE'].pct_change(periods=periods) * 100
+    
+    # カテゴリー定義（選択されたカテゴリーのみ）
+    all_categories = get_cpi_contribution_categories()
+    
+    # 寄与度計算は常に全カテゴリーで実行（表示フィルタリングは後で行う）
+    categories = all_categories
+    
+    contribution_data = []
+    
+    for date in all_items_data['DATE'].unique():
+        if pd.isna(date):
+            continue
+            
+        date_data = df[df['DATE'] == date]
+        all_items_yoy = all_items_data[all_items_data['DATE'] == date]['YoY_Change'].iloc[0] if len(all_items_data[all_items_data['DATE'] == date]) > 0 else 0
+        
+        if pd.isna(all_items_yoy):
+            continue
+            
+        for category_name, category_info in categories.items():
+            # カテゴリー内の商品データを取得
+            category_data = date_data[date_data['PRODUCT'].isin(category_info['products'])]
+            
+            if not category_data.empty:
+                # 代表的な商品の変化率を使用
+                if category_name == "Core Services" and len(category_data[category_data['PRODUCT'] == 'Services less energy services']) > 0:
+                    representative_product = category_data[category_data['PRODUCT'] == 'Services less energy services'].iloc[0]
+                elif category_name == "Core Goods" and len(category_data[category_data['PRODUCT'] == 'Commodities less food and energy commodities']) > 0:
+                    representative_product = category_data[category_data['PRODUCT'] == 'Commodities less food and energy commodities'].iloc[0]
+                elif category_name == "Food" and len(category_data[category_data['PRODUCT'] == 'Food']) > 0:
+                    representative_product = category_data[category_data['PRODUCT'] == 'Food'].iloc[0]
+                elif category_name == "Energy" and len(category_data[category_data['PRODUCT'] == 'Energy']) > 0:
+                    representative_product = category_data[category_data['PRODUCT'] == 'Energy'].iloc[0]
+                else:
+                    continue
+                
+                # 前年同月比計算（個別に）
+                product_historical = df[(df['PRODUCT'] == representative_product['PRODUCT']) & 
+                                      (df['DATE'] <= date)].sort_values('DATE')
+                
+                required_periods = periods + 1  # 前年同期 + 現在のデータが必要
+                if len(product_historical) >= required_periods:
+                    current_value = product_historical.iloc[-1]['VALUE']
+                    year_ago_value = product_historical.iloc[-1-periods]['VALUE']
+                    category_yoy = ((current_value / year_ago_value) - 1) * 100
+                    
+                    # 寄与度計算（ウェイト × 変化率）
+                    contribution = category_info['weight'] * category_yoy
+                    
+                    # Core CPI YoYを追加（選択されている場合のみ）
+                    core_cpi_yoy = None
+                    if show_core_cpi and not core_cpi_data.empty:
+                        core_date_data = core_cpi_data[core_cpi_data['DATE'] == date]
+                        if not core_date_data.empty:
+                            core_cpi_yoy = core_date_data['YoY_Change'].iloc[0]
+                    
+                    contribution_data.append({
+                        'DATE': date,
+                        'Category': category_name,
+                        'Contribution': contribution,
+                        'Weight': category_info['weight'],
+                        'YoY_Change': category_yoy,
+                        'Color': category_info['color'],
+                        'All_Items_YoY': all_items_yoy,
+                        'Core_CPI_YoY': core_cpi_yoy
+                    })
+    
+    return pd.DataFrame(contribution_data)
+
+def create_bloomberg_contribution_chart_integrated(contribution_df, selected_categories=None):
+    """前月比積み上げヒストグラムと同じスタイルの寄与度チャート（All Items/Core CPIライン付き、動的Y軸調整、選択カテゴリー対応）"""
+    if contribution_df.empty:
+        return go.Figure()
+    
+    # データを月ごとにピボット
+    pivot_df = contribution_df.pivot(index='DATE', columns='Category', values='Contribution').fillna(0)
+    
+    # チャート作成
+    fig = go.Figure()
+    
+    # カテゴリー順序とカラー（選択されたカテゴリーのみ）
+    categories = get_cpi_contribution_categories()
+    
+    # 選択されたカテゴリーに基づいてフィルタリング
+    if selected_categories:
+        category_mapping = {
+            '⚡ Energy': 'Energy',
+            '🍎 Food': 'Food', 
+            '📦 Core Goods': 'Core Goods',
+            '🏠 Core Services': 'Core Services'
+        }
+        
+        filtered_categories = []
+        for selected_cat in selected_categories:
+            if selected_cat in category_mapping:
+                filtered_categories.append(category_mapping[selected_cat])
+        
+        category_order = filtered_categories if filtered_categories else []
+    else:
+        category_order = ['Energy', 'Food', 'Core Goods', 'Core Services']
+    
+    # 積み上げ棒グラフの作成
+    for category in category_order:
+        if category in pivot_df.columns:
+            color = categories[category]['color']
+            
+            fig.add_trace(go.Bar(
+                name=category,
+                x=pivot_df.index,
+                y=pivot_df[category],
+                marker_color=color,
+                opacity=0.85,
+                hovertemplate=f'<b>{category}</b><br>' +
+                             'Date: %{x}<br>' +
+                             'Contribution: %{y:.2f}pp<br>' +
+                             '<extra></extra>'
+            ))
+    
+    # All Items CPIライン（選択されている場合のみ表示）
+    show_all_items = selected_categories is None or '📈 All Items' in selected_categories
+    if show_all_items and not contribution_df.empty and 'All_Items_YoY' in contribution_df.columns:
+        all_items_line = contribution_df.groupby('DATE')['All_Items_YoY'].first().dropna()
+        if not all_items_line.empty:
+            fig.add_trace(go.Scatter(
+                name='All Items CPI (YoY)',
+                x=all_items_line.index,
+                y=all_items_line.values,
+                mode='lines+markers',
+                line=dict(color='#1E88E5', width=2),
+                marker=dict(size=8, color='#1E88E5'),
+                hovertemplate='<b>All Items CPI</b><br>' +
+                             'Date: %{x}<br>' +
+                             'YoY: %{y:.2f}%<br>' +
+                             '<extra></extra>'
+            ))
+    
+    # Core CPIライン（選択されている場合のみ表示）
+    show_core_cpi = selected_categories is None or '🎯 Core CPI' in selected_categories
+    if show_core_cpi and not contribution_df.empty and 'Core_CPI_YoY' in contribution_df.columns:
+        core_cpi_line = contribution_df.groupby('DATE')['Core_CPI_YoY'].first().dropna()
+        if not core_cpi_line.empty:
+            fig.add_trace(go.Scatter(
+                name='Core CPI (YoY)',
+                x=core_cpi_line.index,
+                y=core_cpi_line.values,
+                mode='lines+markers',
+                line=dict(color='#D32F2F', width=2),
+                marker=dict(size=8, color='#D32F2F'),
+                hovertemplate='<b>Core CPI</b><br>' +
+                             'Date: %{x}<br>' +
+                             'YoY: %{y:.2f}%<br>' +
+                             '<extra></extra>'
+            ))
+    
+    # Y軸範囲計算：積み上げデータとラインデータを分離
+    bar_data = []
+    line_data = []
+    
+    # 積み上げ棒グラフのデータを収集
+    for category in category_order:
+        if category in pivot_df.columns:
+            category_data = pivot_df[category].dropna()
+            bar_data.extend(category_data.tolist())
+    
+    # ラインチャートのデータを条件に応じて収集
+    if show_all_items and not contribution_df.empty and 'All_Items_YoY' in contribution_df.columns:
+        all_items_line = contribution_df.groupby('DATE')['All_Items_YoY'].first().dropna()
+        if not all_items_line.empty:
+            line_data.extend(all_items_line.tolist())
+    
+    if show_core_cpi and not contribution_df.empty and 'Core_CPI_YoY' in contribution_df.columns:
+        core_cpi_line = contribution_df.groupby('DATE')['Core_CPI_YoY'].first().dropna()
+        if not core_cpi_line.empty:
+            line_data.extend(core_cpi_line.tolist())
+    
+    # 実際に表示されるデータを結合
+    displayed_data = bar_data + line_data
+    
+    
+    # Y軸範囲を表示されるデータに基づいて設定
+    if displayed_data and len(displayed_data) > 0:
+        # 有効な数値データのみを使用
+        valid_data = [x for x in displayed_data if not pd.isna(x) and abs(x) < 1000]
+        
+        if valid_data:
+            y_min = min(valid_data)
+            y_max = max(valid_data)
+            y_range_size = y_max - y_min
+            
+            # 適切なマージンを追加
+            if y_range_size > 0.1:  # 最小範囲チェック
+                margin = max(y_range_size * 0.15, 0.5)  # 最小マージン確保
+                y_range = [y_min - margin, y_max + margin]
+            else:
+                # データ範囲が小さい場合
+                center = (y_min + y_max) / 2
+                y_range = [center - 1, center + 1]
+            
+            # ゼロラインを含むように調整
+            if y_range[0] > 0.1:
+                y_range[0] = min(y_range[0], -0.2)
+            if y_range[1] < -0.1:
+                y_range[1] = max(y_range[1], 0.2)
+        else:
+            y_range = [-1, 3]
+    else:
+        # データがない場合のデフォルト範囲
+        y_range = [-1, 3]
+    
+    # レイアウト設定（確実なY軸範囲適用）
+    fig.update_layout(
+        title={
+            'text': '📊 主要カテゴリー CPI 寄与度分析（積み上げ表示）',
+            'x': 0,
+            'font': {'size': 18, 'family': 'Arial, sans-serif'}
+        },
+        xaxis_title='期間',
+        yaxis_title='前年同月比 / 寄与度 (%)',
+        barmode='stack',
+        height=600,
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        hovermode='x unified',
+        plot_bgcolor='white',
+        paper_bgcolor='white'
+    )
+    
+    # Y軸範囲を確実に設定
+    fig.update_yaxes(range=y_range)
+    
+    # ゼロラインの追加（前月比積み上げヒストグラムと同じ）
+    fig.add_hline(y=0, line_dash="dash", line_color="gray", opacity=0.7, line_width=1)
+    
+    # FRBターゲットライン（2%がY軸範囲内にある場合のみ表示）
+    if len(y_range) >= 2 and y_range[0] <= 2 <= y_range[1]:
+        fig.add_hline(y=2, line_color="gray", line_width=0.5, line_dash="dash", 
+                      opacity=0.5)
+    
+    # グリッドの設定（前月比積み上げヒストグラムと同じ）
+    fig.update_xaxes(showgrid=True, gridwidth=0.5, gridcolor='lightgray')
+    fig.update_yaxes(showgrid=True, gridwidth=0.5, gridcolor='lightgray')
+    
+    return fig
+
+@st.cache_data(ttl=3600)
+def load_cpi_timeseries_for_contribution(start_date, end_date, frequency='Monthly'):
+    """寄与度分析用のCPI時系列データを取得"""
+    if not st.session_state.get('snowflake_available', False):
+        return pd.DataFrame()
+    
+    try:
+        query = """
+        SELECT 
+            ts.VARIABLE,
+            ts.DATE,
+            ts.VALUE,
+            attr.VARIABLE_NAME,
+            attr.PRODUCT,
+            attr.SEASONALLY_ADJUSTED,
+            attr.FREQUENCY,
+            attr.UNIT
+        FROM FINANCE__ECONOMICS.CYBERSYN.BUREAU_OF_LABOR_STATISTICS_PRICE_TIMESERIES ts
+        JOIN FINANCE__ECONOMICS.CYBERSYN.BUREAU_OF_LABOR_STATISTICS_PRICE_ATTRIBUTES attr
+            ON ts.VARIABLE = attr.VARIABLE
+        WHERE attr.REPORT = 'Consumer Price Index'
+            AND attr.SEASONALLY_ADJUSTED = True
+            AND attr.FREQUENCY = '{}'
+            AND ts.DATE >= '{}'
+            AND ts.DATE <= '{}'
+            AND ts.VALUE IS NOT NULL
+            AND (
+                attr.PRODUCT IN ('All items', 'All items less food and energy', 'Food', 'Energy', 
+                               'Services less energy services', 'Commodities less food and energy commodities',
+                               'Shelter', 'Transportation services', 'Food at home', 'Food away from home',
+                               'New vehicles', 'Used vehicles and trucks', 'Energy services', 'Gasoline (all types)')
+            )
+        ORDER BY ts.VARIABLE, ts.DATE
+        """.format(frequency, start_date, end_date)
+        
+        df = session.sql(query).to_pandas()
+        
+        if not df.empty:
+            df['DATE'] = pd.to_datetime(df['DATE'])
+            # 月末に正規化
+            df['DATE'] = df['DATE'].dt.to_period('M').dt.end_time
+        
+        return df
+    except Exception as e:
+        st.error(f"CPI時系列データの取得に失敗しました: {str(e)}")
+        return pd.DataFrame()
 
 def main():
     """メイン関数"""
@@ -1007,7 +1481,8 @@ def main():
     selected_frequency = st.sidebar.selectbox(
         "データ頻度",
         frequency_options,
-        index=frequency_options.index('Monthly') if 'Monthly' in frequency_options else 0
+        index=frequency_options.index('Monthly') if 'Monthly' in frequency_options else 0,
+        help="データ頻度を選択。寄与度分析も含めてすべての分析に適用されます。"
     )
     
     # 季節調整フィルタ
@@ -1094,11 +1569,6 @@ def main():
         help="積み上げヒストグラム表示が推奨です"
     )
     
-    show_detailed_breakdown = st.sidebar.checkbox(
-        "📈 月別詳細内訳表示", 
-        value=False,
-        help="商品別の月次YoY%詳細分析"
-    )
     
     # 分析オプション
     st.sidebar.subheader("🔧 分析オプション")
@@ -1145,10 +1615,23 @@ def main():
     
     # 各商品のインフレ指標計算（テーブル表示用）
     inflation_data = {}
-    for product in selected_products:
-        product_data = timeseries_df[timeseries_df['PRODUCT'] == product]
-        if not product_data.empty:
-            inflation_data[product] = calculate_inflation_metrics(product_data, product)
+    
+    if selection_mode == "📊 主要カテゴリー（推奨）":
+        # 主要カテゴリー選択時：各カテゴリーの主要商品のみを使用
+        major_categories = get_major_cpi_categories()
+        for category in selected_categories:
+            if category in major_categories:
+                # 各カテゴリーの最初の商品（主要商品）のみを取得
+                main_product = major_categories[category]['products'][0]
+                product_data = timeseries_df[timeseries_df['PRODUCT'] == main_product]
+                if not product_data.empty:
+                    inflation_data[main_product] = calculate_inflation_metrics(product_data, main_product)
+    else:
+        # 個別商品選択時：選択された全商品を使用
+        for product in selected_products:
+            product_data = timeseries_df[timeseries_df['PRODUCT'] == product]
+            if not product_data.empty:
+                inflation_data[product] = calculate_inflation_metrics(product_data, product)
 
     # All Itemsベースライン重ね表示オプションを削除（分析対象カテゴリーに含まれるため）
     # overlay_baseline = st.checkbox(
@@ -1161,11 +1644,76 @@ def main():
     if selection_mode == "📊 主要カテゴリー（推奨）":
         # 主要カテゴリー選択時
         if chart_style == "積み上げヒストグラム（前年同月比）":
-            cpi_chart = create_major_category_chart(timeseries_df, selected_categories, "yoy")
+            # 寄与度分析チャートを使用（Bloomberg/X風）
+            with st.spinner("🔢 寄与度を計算中..."):
+                # 寄与度分析専用のデータ読み込み
+                contribution_timeseries_df = load_cpi_timeseries_for_contribution(start_date, end_date, selected_frequency)
+                
+                if not contribution_timeseries_df.empty:
+                    st.success(f"✅ 寄与度分析用データ読み込み完了: {len(contribution_timeseries_df['PRODUCT'].unique())}個の商品データを取得")
+                    contribution_df = calculate_contribution_data_for_categories(contribution_timeseries_df, selected_categories)
+                    
+                    if not contribution_df.empty:
+                        st.success(f"✅ 寄与度分析データ準備完了: {len(contribution_df)}行のデータを生成")
+                        cpi_chart = create_bloomberg_contribution_chart_integrated(contribution_df, selected_categories)
+                        # 寄与度分析の説明を追加（選択カテゴリーに応じて動的に変更）
+                        category_names = []
+                        line_names = []
+                        
+                        category_mapping = {
+                            '⚡ Energy': 'Energy',
+                            '🍎 Food': 'Food', 
+                            '📦 Core Goods': 'Core Goods',
+                            '🏠 Core Services': 'Core Services'
+                        }
+                        
+                        for selected_cat in selected_categories:
+                            if selected_cat in category_mapping:
+                                category_names.append(category_mapping[selected_cat])
+                            elif selected_cat == '📈 All Items':
+                                line_names.append('All Items CPI')
+                            elif selected_cat == '🎯 Core CPI':
+                                line_names.append('Core CPI')
+                        
+                        # 説明文を構築
+                        parts = []
+                        if category_names:
+                            categories_text = ', '.join(category_names)
+                            parts.append(f"各カテゴリー（{categories_text}）の寄与度")
+                        
+                        if line_names:
+                            lines_text = ', '.join(line_names)
+                            parts.append(f"{lines_text}の前年同期比ライン")
+                        
+                        if parts:
+                            description = ' と '.join(parts)
+                            st.info(f"📊 **寄与度分析**: {description}をBloomberg Professional風に表示しています。")
+                        else:
+                            st.info("📊 **寄与度分析**: 各カテゴリーが全体のインフレ率に与える寄与度をBloomberg Professional風に表示しています。")
+                    else:
+                        st.warning("⚠️ 寄与度計算でデータが生成されませんでした。より長い期間を選択してください（12ヶ月以上推奨）。")
+                        cpi_chart = create_major_category_chart(timeseries_df, selected_categories, "yoy")
+                else:
+                    st.warning("⚠️ 寄与度分析用データが取得できませんでした。期間を調整してみてください。")
+                    cpi_chart = create_major_category_chart(timeseries_df, selected_categories, "yoy")
         elif chart_style == "積み上げヒストグラム（前月比）":
             cpi_chart = create_major_category_chart(timeseries_df, selected_categories, "mom")
         else:
-            cpi_chart = create_cpi_comparison_chart(timeseries_df, selected_products)
+            # 従来のライン表示：選択されたカテゴリーの主要商品のみ表示
+            major_categories = get_major_cpi_categories()
+            main_products = []
+            for category in selected_categories:
+                if category in major_categories:
+                    # 各カテゴリーの最初の商品のみを取得（主要商品）
+                    products_list = major_categories[category]['products']
+                    if products_list:
+                        main_products.append(products_list[0])  # 主要商品のみ
+            
+            # 重複削除と実際にデータが存在する商品のみフィルタ
+            unique_products = list(set(main_products))
+            available_products = [p for p in unique_products if p in timeseries_df['PRODUCT'].unique()]
+            
+            cpi_chart = create_cpi_comparison_chart(timeseries_df, available_products)
     else:
         # 個別商品選択時
         st.info(f"🔍 個別商品選択モード: {len(selected_products)}個の商品を分析中...")
@@ -1200,25 +1748,23 @@ def main():
         for category in selected_categories:
             if category in major_categories:
                 category_info = major_categories[category]
-                category_products = category_info['products']
-                category_data = timeseries_df[timeseries_df['PRODUCT'].isin(category_products)]
+                # 各カテゴリーの主要商品（最初の商品）のみを使用
+                main_product = category_info['products'][0]
+                product_data = timeseries_df[timeseries_df['PRODUCT'] == main_product]
                 
-                if not category_data.empty:
+                if not product_data.empty:
                     # 最新データを取得
-                    latest_data = category_data.loc[category_data.groupby('PRODUCT')['DATE'].idxmax()]
+                    latest_row = product_data.sort_values('DATE').iloc[-1]
+                    metrics = calculate_inflation_metrics(product_data, main_product)
                     
-                    for _, row in latest_data.iterrows():
-                        product_data = category_data[category_data['PRODUCT'] == row['PRODUCT']]
-                        metrics = calculate_inflation_metrics(product_data, row['PRODUCT'])
-                        
-                        table_data.append({
-                            'カテゴリー': category.split(' ', 1)[1],
-                            '商品名': row['PRODUCT'],
-                            '最新CPI': f"{row['VALUE']:.1f}",
-                            '前年同月比': f"{metrics.get('yearly_change', 0):.2f}%",
-                            '前月比': f"{metrics.get('monthly_change', 0):.2f}%",
-                            '最終更新': row['DATE'].strftime('%Y-%m')
-                        })
+                    table_data.append({
+                        'カテゴリー': category.split(' ', 1)[1],
+                        '商品名': main_product,
+                        '最新CPI': f"{latest_row['VALUE']:.1f}",
+                        '前年同月比': f"{metrics.get('yearly_change', 0):.2f}%",
+                        '前月比': f"{metrics.get('monthly_change', 0):.2f}%",
+                        '最終更新': latest_row['DATE'].strftime('%Y-%m')
+                    })
         
         if table_data:
             table_df = pd.DataFrame(table_data)
@@ -1258,20 +1804,20 @@ def main():
             table_df = pd.DataFrame(table_data)
             st.dataframe(table_df, use_container_width=True, hide_index=True)
     
-    # 月別詳細内訳表示
-    if show_detailed_breakdown and len(selected_products) <= 5:
-        st.markdown('<div class="section-title">📈 商品別月次YoY%詳細分析</div>', unsafe_allow_html=True)
-        st.markdown("""
-        <div class="info-box">
-        <b>エコノミスト向け詳細分析:</b> 各商品の月次前年同月比変化を個別に表示。
-        インフレーション圧力の商品別寄与度を詳細に把握できます。
-        </div>
-        """, unsafe_allow_html=True)
-        
-        monthly_breakdown_chart = create_monthly_yoy_breakdown_chart(timeseries_df, selected_products)
-        st.plotly_chart(monthly_breakdown_chart, use_container_width=True)
-    elif show_detailed_breakdown and len(selected_products) > 5:
-        st.warning("⚠️ 月別詳細内訳は商品選択数を5個以下にしてください。")
+    # 月別詳細内訳表示 - 削除
+    # if show_detailed_breakdown and len(selected_products) <= 5:
+    #     st.markdown('<div class="section-title">📈 商品別月次YoY%詳細分析</div>', unsafe_allow_html=True)
+    #     st.markdown("""
+    #     <div class="info-box">
+    #     <b>エコノミスト向け詳細分析:</b> 各商品の月次前年同月比変化を個別に表示。
+    #     インフレーション圧力の商品別寄与度を詳細に把握できます。
+    #     </div>
+    #     """, unsafe_allow_html=True)
+    #     
+    #     monthly_breakdown_chart = create_monthly_yoy_breakdown_chart(timeseries_df, selected_products)
+    #     st.plotly_chart(monthly_breakdown_chart, use_container_width=True)
+    # elif show_detailed_breakdown and len(selected_products) > 5:
+    #     st.warning("⚠️ 月別詳細内訳は商品選択数を5個以下にしてください。")
     
     # インフレ率分析
     if show_inflation_rates and inflation_data:
@@ -1496,6 +2042,7 @@ def main():
                 fig_corr.update_layout(
                     height=600,  # 高さを増加
                     title={
+                        'x': 0,
                         'font': {'size': 16}
                     }
                 )
