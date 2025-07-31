@@ -1092,7 +1092,7 @@ def create_individual_products_chart(df, selected_products, chart_type="yoy"):
     
     return fig
 
-def calculate_contribution_data_for_categories(df, selected_categories=None):
+def calculate_contribution_data_for_categories(df, selected_categories=None, user_start_date=None):
     """各カテゴリーの寄与度を計算（主要カテゴリー用、選択カテゴリー対応）"""
     if df.empty:
         return pd.DataFrame()
@@ -1177,16 +1177,18 @@ def calculate_contribution_data_for_categories(df, selected_categories=None):
                         if not core_date_data.empty:
                             core_cpi_yoy = core_date_data['YoY_Change'].iloc[0]
                     
-                    contribution_data.append({
-                        'DATE': date,
-                        'Category': category_name,
-                        'Contribution': contribution,
-                        'Weight': category_info['weight'],
-                        'YoY_Change': category_yoy,
-                        'Color': category_info['color'],
-                        'All_Items_YoY': all_items_yoy,
-                        'Core_CPI_YoY': core_cpi_yoy
-                    })
+                    # ユーザー指定の開始日以降のデータのみを追加
+                    if user_start_date is None or date >= pd.to_datetime(user_start_date):
+                        contribution_data.append({
+                            'DATE': date,
+                            'Category': category_name,
+                            'Contribution': contribution,
+                            'Weight': category_info['weight'],
+                            'YoY_Change': category_yoy,
+                            'Color': category_info['color'],
+                            'All_Items_YoY': all_items_yoy,
+                            'Core_CPI_YoY': core_cpi_yoy
+                        })
     
     return pd.DataFrame(contribution_data)
 
@@ -1378,6 +1380,16 @@ def load_cpi_timeseries_for_contribution(start_date, end_date, frequency='Monthl
         return pd.DataFrame()
     
     try:
+        # YoY計算のために開始日から12ヶ月前のデータも取得
+        from datetime import datetime, timedelta
+        if isinstance(start_date, str):
+            actual_start_date = datetime.strptime(start_date, '%Y-%m-%d')
+        else:
+            actual_start_date = start_date
+        
+        # 12ヶ月前からデータを取得（YoY計算のため）
+        extended_start_date = actual_start_date - timedelta(days=365)
+        
         query = """
         SELECT 
             ts.VARIABLE,
@@ -1404,7 +1416,7 @@ def load_cpi_timeseries_for_contribution(start_date, end_date, frequency='Monthl
                                'New vehicles', 'Used vehicles and trucks', 'Energy services', 'Gasoline (all types)')
             )
         ORDER BY ts.VARIABLE, ts.DATE
-        """.format(frequency, start_date, end_date)
+        """.format(frequency, extended_start_date.strftime('%Y-%m-%d'), end_date)
         
         df = session.sql(query).to_pandas()
         
@@ -1651,7 +1663,7 @@ def main():
                 
                 if not contribution_timeseries_df.empty:
                     st.success(f"✅ 寄与度分析用データ読み込み完了: {len(contribution_timeseries_df['PRODUCT'].unique())}個の商品データを取得")
-                    contribution_df = calculate_contribution_data_for_categories(contribution_timeseries_df, selected_categories)
+                    contribution_df = calculate_contribution_data_for_categories(contribution_timeseries_df, selected_categories, user_start_date=start_date)
                     
                     if not contribution_df.empty:
                         st.success(f"✅ 寄与度分析データ準備完了: {len(contribution_df)}行のデータを生成")
