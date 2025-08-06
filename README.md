@@ -3,10 +3,6 @@
 
 エコノミスト・政策立案者・アナリスト向けの高度なCPI分析プラットフォーム
 
-![Python](https://img.shields.io/badge/python-v3.8+-blue.svg)
-![Streamlit](https://img.shields.io/badge/streamlit-v1.28+-red.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-
 ## 🎯 概要
 
 本システムは、米国労働統計局（BLS）の消費者物価指数データを活用した包括的な経済分析プラットフォームです。プロフェッショナルな経済分析に必要な高度な統計処理、AI支援分析、インタラクティブな可視化機能を提供します。
