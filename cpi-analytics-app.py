@@ -627,7 +627,7 @@ def main():
 
             ai_model_complete = st.selectbox(
                 "🧠 使用するAIモデルを選択",
-                ["claude-4-sonnet", "claude-3-5-sonnet", "llama4-maverick", "gemma-7b"],
+                ["llama4-maverick", "claude-4-sonnet", "claude-3-5-sonnet", "mistral-large2"],
                 key="model_selector_complete"
             )
             
